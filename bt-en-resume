@@ -1,21 +1,21 @@
 #!/bin/sh
 # /usr/lib/systemd/system-sleep/bt-en-resume
-# HP Laptop 15s-fq1xxx (BIOS F.30) + Realtek RTL8821CE:
-# после выхода из S3 BIOS оставляет линию включения Bluetooth (GPIO 0x06010012)
-# в нуле, и BT-часть чипа остаётся выключенной. Поднимаем её сами.
-# Нужен модуль acpi_call (пакет acpi_call / acpi_call-dkms).
+# HP Laptop 15s-fq1xxx (board 86C9, BIOS F.30) + Realtek RTL8821CE.
+# After resume from S3 the BIOS leaves the Bluetooth enable line (GPIO pad 0x06010012) low,
+# so the Bluetooth half of the chip stays off. This hook raises it again.
+# Requires the acpi_call kernel module.
 
 [ "$1" = "post" ] || exit 0
 modprobe acpi_call 2>/dev/null
-[ -w /proc/acpi/call ] || { logger -t bt-en-resume "нет /proc/acpi/call"; exit 0; }
+[ -w /proc/acpi/call ] || { logger -t bt-en-resume "no /proc/acpi/call (acpi_call not loaded)"; exit 0; }
 
 printf '%s' '\_SB.GGOV 0x06010012' > /proc/acpi/call
 state=$(tr -d '\0' < /proc/acpi/call)
 
-if [ "$state" != "0x1" ]; then
-    printf '%s' '\_SB.SGOV 0x06010012 0x1' > /proc/acpi/call
-    logger -t bt-en-resume "BT_EN был $state, включил"
-else
-    logger -t bt-en-resume "BT_EN уже включён"
-fi
+case "$state" in
+    0x1) logger -t bt-en-resume "BT_EN already 0x1, nothing to do" ;;
+    0x0) printf '%s' '\_SB.SGOV 0x06010012 0x1' > /proc/acpi/call
+         logger -t bt-en-resume "BT_EN was 0x0, set to 0x1" ;;
+    *)   logger -t bt-en-resume "unexpected answer '$state', not touching anything" ;;
+esac
 exit 0

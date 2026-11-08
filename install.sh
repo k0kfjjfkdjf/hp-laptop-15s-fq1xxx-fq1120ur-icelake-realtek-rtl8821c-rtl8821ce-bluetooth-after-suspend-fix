@@ -13,9 +13,10 @@ cd "$(dirname "$(readlink -f "$0")")"
 
 model=$(cat /sys/class/dmi/id/product_name 2>/dev/null || true)
 board=$(cat /sys/class/dmi/id/board_name 2>/dev/null || true)
-echo "Model: $model | Board: $board"
-if [[ $model != *"15s-fq1"* || $board != "86C9" ]]; then
-    echo "WARNING: this fix was made for HP Laptop 15s-fq1xxx (board 86C9)."
+bios=$(cat /sys/class/dmi/id/bios_version 2>/dev/null || true)
+echo "Model: $model | Board: $board | BIOS: $bios"
+if [[ $model != *"15s-fq1"* || $board != "86C9" || $bios != "F.30" ]]; then
+    echo "WARNING: this fix was verified only on HP Laptop 15s-fq1xxx, board 86C9, BIOS F.30."
     echo "The GPIO pin $BT_GPIO may be different (or dangerous to touch) on your machine."
     read -r -p "Continue anyway? [y/N] " a; [[ $a == [yY]* ]] || exit 1
 fi

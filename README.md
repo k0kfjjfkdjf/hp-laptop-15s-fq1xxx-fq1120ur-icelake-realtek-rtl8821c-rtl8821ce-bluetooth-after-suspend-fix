@@ -2,6 +2,30 @@
 
 # Bluetooth disappears after suspend — HP Laptop 15s-fq1xxx + Realtek RTL8821CE
 
+<a id="warning"></a>
+
+> [!CAUTION]
+> **Read this before running anything.**
+>
+> - This fix was found and verified on **one machine only**: HP 15s-fq1120ur (SKU `286V9EA`),
+>   DMI board **`86C9`**, BIOS **F.30**. The number `0x06010012` is a GPIO pad of the Intel chipset
+>   taken from *this* BIOS. On another model or another BIOS version the same number may point to a
+>   **different pin** (touchpad, display, power rails, anything). Writing to the wrong pin can make
+>   hardware stop working until reboot, and in the worst case can do things nobody can predict.
+> - **Check your model first** (step 0 below). If board, product name or BIOS differ, do **not**
+>   write anything. See [Other laptops](#other-laptops-finding-your-own-pin) to find your own pin
+>   in your own ACPI tables.
+> - **Read before you write.** The read command must return exactly `0x0` or `0x1`. Any other
+>   answer (an error, `not called`, a big number) means the pin or method does not exist on your
+>   machine: stop there.
+> - `acpi_call` lets root call **any** ACPI method. It is a powerful debugging tool, not a
+>   polished driver. A typo in a method name or argument goes straight to the firmware.
+> - `acpi_call` is an out-of-tree, unsigned module: it taints the kernel, and with Secure Boot /
+>   enforced module signatures it may refuse to load. That is expected, not a bug of this fix.
+> - Nothing here writes to the BIOS, flash or NVRAM. The pin state lives only until the next
+>   reboot or suspend. **To undo everything: delete the hook file and reboot.**
+> - Not affiliated with HP or Realtek. No warranty, use at your own risk ([MIT](LICENSE)).
+
 A fix for Linux: the Bluetooth part of the Realtek **RTL8821CE** Wi‑Fi/Bluetooth combo card
 vanishes after suspend-to-RAM (S3, `deep`) on **HP Laptop 15s-fq1xxx** (tested on
 **15s-fq1120ur**) and does not come back until a reboot.
@@ -12,11 +36,107 @@ stays hardware-disabled and drops off the USB bus.
 **Fix:** a `systemd-sleep` hook that raises that line again after resume, using the BIOS's own
 ACPI methods via `acpi_call`.
 
+## Manual fix (raw commands, no scripts)
+
+Every step is one command you can read and understand. Commands work in bash, zsh and fish.
+
+**0. Check that this is the same machine.** Expected: `HP Laptop 15s-fq1xxx`, `86C9`, `F.30`.
+
+```bash
+cat /sys/class/dmi/id/product_name /sys/class/dmi/id/board_name /sys/class/dmi/id/bios_version
+```
+
+**1. Check that you have this exact bug** (after a suspend/resume, Bluetooth gone):
+
+```bash
+lsusb | grep 0bda:b00a                     # empty = Bluetooth adapter is gone from USB
+sudo journalctl -k -b | grep 'usb 1-10'          # look for "USB disconnect" right after "Waking up from system sleep state S3"
+```
+
+**2. Install and load `acpi_call`:**
+
+```bash
+sudo pacman -S acpi_call-dkms               # or acpi_call for the stock "linux" kernel; other distros: acpi-call-dkms
+sudo modprobe acpi_call
+```
+
+**3. Read the Bluetooth enable pin (read-only, safe):**
+
+```bash
+echo '\_SB.GGOV 0x06010012' | sudo tee /proc/acpi/call
+sudo cat /proc/acpi/call; echo
+```
+
+`0x0` = Bluetooth is switched off by hardware (this bug). `0x1` = switched on.
+**Anything else: stop here.**
+
+**4. Switch Bluetooth back on (only if step 3 printed `0x0`):**
+
+```bash
+echo '\_SB.SGOV 0x06010012 0x1' | sudo tee /proc/acpi/call
+```
+
+Within 1–2 seconds:
+
+```bash
+lsusb | grep 0bda:b00a                     # adapter is back
+bluetoothctl show                          # controller is back
+```
+
+**5. Make it automatic after every resume.** Create the file
+`/usr/lib/systemd/system-sleep/bt-en-resume` with any editor (`sudo nano ...`) and paste:
+
+```sh
+#!/bin/sh
+# /usr/lib/systemd/system-sleep/bt-en-resume
+# HP Laptop 15s-fq1xxx (board 86C9, BIOS F.30) + Realtek RTL8821CE.
+# After resume from S3 the BIOS leaves the Bluetooth enable line (GPIO pad 0x06010012) low,
+# so the Bluetooth half of the chip stays off. This hook raises it again.
+# Requires the acpi_call kernel module.
+
+[ "$1" = "post" ] || exit 0
+modprobe acpi_call 2>/dev/null
+[ -w /proc/acpi/call ] || { logger -t bt-en-resume "no /proc/acpi/call (acpi_call not loaded)"; exit 0; }
+
+printf '%s' '\_SB.GGOV 0x06010012' > /proc/acpi/call
+state=$(tr -d '\0' < /proc/acpi/call)
+
+case "$state" in
+    0x1) logger -t bt-en-resume "BT_EN already 0x1, nothing to do" ;;
+    0x0) printf '%s' '\_SB.SGOV 0x06010012 0x1' > /proc/acpi/call
+         logger -t bt-en-resume "BT_EN was 0x0, set to 0x1" ;;
+    *)   logger -t bt-en-resume "unexpected answer '$state', not touching anything" ;;
+esac
+exit 0
+```
+
+Then make it executable:
+
+```bash
+sudo chmod 755 /usr/lib/systemd/system-sleep/bt-en-resume
+```
+
+**6. Test:** suspend, wake up, then:
+
+```bash
+bluetoothctl show
+sudo journalctl -b -t bt-en-resume         # expect: "BT_EN was 0x0, set to 0x1"
+```
+
+**Undo:**
+
+```bash
+sudo rm /usr/lib/systemd/system-sleep/bt-en-resume
+```
+
+and reboot. Nothing else was changed.
+
 ## Contents
 
+- [⚠️ Warning](#warning) · [Manual fix (raw commands)](#manual-fix-raw-commands-no-scripts)
 - [Symptoms](#symptoms)
 - [Affected hardware](#affected-hardware)
-- [Installation](#installation)
+- [Automatic installation](#automatic-installation-script)
 - [How it works](#how-it-works)
 - [Why the usual fixes don't work](#why-the-usual-fixes-dont-work)
 - [Diagnostic script](#diagnostic-script)
@@ -59,7 +179,9 @@ Tested with kernel `7.2.11-zen1`, `linux-firmware-realtek 20260916`, Bluetooth f
 Other HP 15s / 14s / 250 G8 models with the same board design are likely affected too, but the GPIO
 pin may differ. See [Other laptops](#other-laptops-finding-your-own-pin) before installing.
 
-## Installation
+## Automatic installation (script)
+
+Same as the manual fix above, plus checks. Read the warning at the top first.
 
 1. Install the `acpi_call` kernel module:
 
@@ -95,15 +217,8 @@ pin may differ. See [Other laptops](#other-laptops-finding-your-own-pin) before 
    sudo journalctl -b -t bt-en-resume
    ```
 
-   You should see `BT_EN был 0x0, включил` ("BT_EN was 0x0, turned it on") in the journal and a
+   You should see `BT_EN was 0x0, set to 0x1` in the journal and a
    working controller.
-
-Manual one-off recovery without installing anything (when Bluetooth is already gone):
-
-```bash
-sudo modprobe acpi_call
-echo '\_SB.SGOV 0x06010012 0x1' | sudo tee /proc/acpi/call
-```
 
 ## How it works
 
@@ -283,7 +398,7 @@ This removes the hook and `/etc/modprobe.d/rtl8821ce-fix.conf` (if `--rtw88-twea
 ## Caveats
 
 - The fix depends on `acpi_call`. If the module is missing (removed package, DKMS failed to build
-  for a new kernel), the hook does nothing and logs `нет /proc/acpi/call` ("no /proc/acpi/call").
+  for a new kernel), the hook does nothing and logs `no /proc/acpi/call`.
 - The pin number comes from BIOS **F.30**. After a BIOS update, check that `./bt-diag.sh --no-fix`
   still shows the BT_EN line and a sane value (`0x1` while Bluetooth works).
 - Untested alternatives: `s2idle` instead of `deep` (`mem_sleep_default=s2idle`) should avoid the
