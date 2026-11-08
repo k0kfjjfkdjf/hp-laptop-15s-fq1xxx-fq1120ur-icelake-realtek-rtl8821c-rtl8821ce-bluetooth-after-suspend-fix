@@ -47,4 +47,4 @@ if [[ $state == 0x0 ]]; then
     printf '%s' "\\_SB.SGOV $BT_GPIO 0x1" > /proc/acpi/call
     echo "Bluetooth was off — turned it on now."
 fi
-echo "Done. Test: systemctl suspend, then: bluetoothctl show; journalctl -t bt-en-resume"
+echo "Done. Test: systemctl suspend, then: bluetoothctl show; sudo journalctl -b -t bt-en-resume"

@@ -53,6 +53,7 @@ usb 1-10: USB disconnect, device number 3
 | Laptop | HP Laptop 15s-fq1xxx (Intel Ice Lake, 10th gen), DMI board `86C9`, family `103C_5335KV HP Notebook` | **HP 15s-fq1120ur**, SKU `286V9EA#ACB`, BIOS **F.30** (07/04/2023) |
 | Adapter | Realtek RTL8821C, Linux driver `rtw88` | **RTL8821CE**: Wi‑Fi 5 802.11ac 1x1 over PCIe (`10ec:c821`, subsystem `103c:831a`) + Bluetooth 4.2 over internal USB (`0bda:b00a`) |
 
+Verified on a real suspend/resume cycle: after `usb 1-10: USB disconnect` the adapter re-enumerates in the same second.
 Tested with kernel `7.2.11-zen1`, `linux-firmware-realtek 20260916`, Bluetooth firmware `0x75b8f098`, Arch Linux.
 
 Other HP 15s / 14s / 250 G8 models with the same board design are likely affected too, but the GPIO
@@ -91,7 +92,7 @@ pin may differ. See [Other laptops](#other-laptops-finding-your-own-pin) before 
    systemctl suspend
    # wake the laptop, then:
    bluetoothctl show
-   journalctl -t bt-en-resume
+   sudo journalctl -b -t bt-en-resume
    ```
 
    You should see `BT_EN был 0x0, включил` ("BT_EN was 0x0, turned it on") in the journal and a
@@ -180,7 +181,7 @@ You can see it directly: after a failed resume
 
 1. reads the pin with `\_SB.GGOV 0x06010012`;
 2. if it is not `0x1`, calls `\_SB.SGOV 0x06010012 0x1`, which is exactly what the BIOS itself does at boot;
-3. logs the result to the journal (`journalctl -t bt-en-resume`).
+3. logs the result to the journal (`sudo journalctl -b -t bt-en-resume`).
 
 About one second later the adapter enumerates on USB and Bluetooth works as after a cold boot.
 Suspend stays in `deep` mode, so there is no extra battery drain.

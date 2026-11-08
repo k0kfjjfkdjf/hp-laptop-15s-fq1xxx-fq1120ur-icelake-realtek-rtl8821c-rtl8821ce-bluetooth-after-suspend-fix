@@ -53,6 +53,7 @@ usb 1-10: USB disconnect, device number 3
 | Ноутбук | HP Laptop 15s-fq1xxx (Intel Ice Lake, 10-е поколение), плата DMI `86C9`, семейство `103C_5335KV HP Notebook` | **HP 15s-fq1120ur**, артикул `286V9EA#ACB`, BIOS **F.30** (07/04/2023) |
 | Адаптер | Realtek RTL8821C, драйвер Linux `rtw88` | **RTL8821CE**: Wi‑Fi 5 802.11ac 1x1 по PCIe (`10ec:c821`, подсистема `103c:831a`) + Bluetooth 4.2 по внутреннему USB (`0bda:b00a`) |
 
+Проверено на настоящем цикле сна: после `usb 1-10: USB disconnect` адаптер появляется снова в ту же секунду.
 Проверено на ядре `7.2.11-zen1`, `linux-firmware-realtek 20260916`, прошивка Bluetooth `0x75b8f098`, Arch Linux.
 
 Другие модели HP 15s / 14s / 250 G8 с такой же платой, вероятно, страдают тем же, но номер
@@ -91,7 +92,7 @@ usb 1-10: USB disconnect, device number 3
    systemctl suspend
    # разбуди ноутбук, затем:
    bluetoothctl show
-   journalctl -t bt-en-resume
+   sudo journalctl -b -t bt-en-resume
    ```
 
    В журнале должно появиться `BT_EN был 0x0, включил`, а контроллер должен работать.
@@ -178,7 +179,7 @@ If (((WBTS == One) & (BTDS == One)))
 
 1. читает пин через `\_SB.GGOV 0x06010012`;
 2. если там не `0x1`, вызывает `\_SB.SGOV 0x06010012 0x1`, то есть делает ровно то же, что BIOS при загрузке;
-3. пишет результат в журнал (`journalctl -t bt-en-resume`).
+3. пишет результат в журнал (`sudo journalctl -b -t bt-en-resume`).
 
 Примерно через секунду адаптер появляется на USB, и Bluetooth работает как после холодной
 загрузки. Сон остаётся в режиме `deep`, так что лишнего расхода батареи нет.
