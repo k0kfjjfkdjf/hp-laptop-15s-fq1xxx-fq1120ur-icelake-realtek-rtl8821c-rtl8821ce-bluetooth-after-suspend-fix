@@ -141,7 +141,7 @@ and reboot. Nothing else was changed.
 - [Symptoms](#symptoms)
 - [Affected hardware](#affected-hardware)
 - [Automatic installation](#automatic-installation-script)
-- [Kernel module (experimental)](#kernel-module-experimental-no-gpio-number-at-all)
+- [Kernel module (recommended)](#kernel-module-recommended-no-gpio-number-at-all)
 - [How it works](#how-it-works)
 - [Why the usual fixes don't work](#why-the-usual-fixes-dont-work)
 - [Diagnostic script](#diagnostic-script)
@@ -226,11 +226,17 @@ Same as the manual fix above, plus checks. Read the warning at the top first.
    You should see `BT_EN was 0x0, set to 0x1` in the journal and a
    working controller.
 
-## Kernel module (experimental): no GPIO number at all
+## Kernel module (recommended): no GPIO number at all
 
-> [!WARNING]
-> Experimental. It builds cleanly, but it has **not yet been tested on real hardware**. Keep the
-> `acpi_call` hook installed until you have seen it work after a real suspend.
+> [!NOTE]
+> **Verified on hardware** (HP 15s-fq1120ur, board 86C9, BIOS F.30, Arch Linux, linux-zen 7.2.11, systemd):
+> after a reboot the btfix module is loaded automatically, and after S3 resume it logs
+> `btfix: radios re-enabled by BIOS _STA after resume (0xf)`; Bluetooth comes back with no
+> `acpi_call` and no hook. Bluetooth headphones reconnect normally.
+>
+> On other HP models it should work the same way (it calls the BIOS's own method instead of a
+> hard-coded pin), but that has not been tested. If it does not help on your model, the
+> `acpi_call` hook below remains as a fallback.
 
 Instead of hard-coding the pin, this is a modified copy of the kernel's own
 `drivers/platform/x86/wireless-hotkey.c` (Linux v7.2), the driver that already binds to HP's
@@ -263,8 +269,18 @@ Menu: 1) enable the btfix module · 2) back to the stock in-kernel `wireless-hot
 3) install/remove the `acpi_call` hook · 4) apply now without reboot · 5) reboot ·
 6) show this boot's fix log.
 
-To check the module on first use, keep the hook installed: if the module worked, the hook will log
-`BT_EN already 0x1, nothing to do`, because the line is already up when the hook runs.
+Quick start:
+
+```bash
+git clone https://github.com/k0kfjjfkdjf/hp-laptop-15s-fq1xxx-fq1120ur-icelake-realtek-rtl8821c-rtl8821ce-bluetooth-after-suspend-fix.git
+cd hp-laptop-15s-fq1xxx-fq1120ur-icelake-realtek-rtl8821c-rtl8821ce-bluetooth-after-suspend-fix
+sudo ./btfix --install-command
+btfix          # 1) enable the btfix module, then 5) reboot
+```
+
+After a suspend/resume, `sudo journalctl -b -k | grep btfix` should show the `re-enabled` line.
+If you also keep the `acpi_call` hook as a safety net, the hook will log `BT_EN already 0x1,
+nothing to do`, which means the module already did the job.
 
 ## How it works
 

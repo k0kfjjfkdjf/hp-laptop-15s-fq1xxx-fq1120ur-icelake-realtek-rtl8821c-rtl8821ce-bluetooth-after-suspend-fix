@@ -183,8 +183,10 @@ menu() {
             3) if [[ $HOOKON -eq 1 ]]; then remove_hook; else install_hook; fi; pause ;;
             4) apply_now; pause ;;
             5) ask "Перезагрузить сейчас?" && systemctl reboot ;;
-            6) journalctl -b --no-pager -o short -t bt-en-resume 2>/dev/null | tail -10
-               journalctl -b -k --no-pager -o short 2>/dev/null | grep -i btfix | tail -10
+            6) echo "  ${B}Модуль btfix:${N}"
+               journalctl -b -k --no-pager -o short 2>/dev/null | grep -i btfix | tail -10 | sed 's/^/    /'
+               echo "  ${B}Хук acpi_call:${N}"
+               journalctl -b --no-pager -o short -q -t bt-en-resume 2>/dev/null | tail -10 | sed 's/^/    /' | grep . || echo "    (записей нет)"
                pause ;;
             q|Q|й|Й) exit 0 ;;
         esac
