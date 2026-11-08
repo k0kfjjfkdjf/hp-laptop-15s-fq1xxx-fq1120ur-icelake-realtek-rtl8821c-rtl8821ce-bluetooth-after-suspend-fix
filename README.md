@@ -8,7 +8,8 @@
 > **Read this before running anything.**
 >
 > - This fix was found and verified on **one machine only**: HP 15s-fq1120ur (SKU `286V9EA`),
->   DMI board **`86C9`**, BIOS **F.30**. The number `0x06010012` is a GPIO pad of the Intel chipset
+>   DMI board **`86C9`**, BIOS **F.30**, running **Arch Linux** with the **linux-zen** kernel
+>   (7.2.11-zen1) and **systemd**. Other distributions and kernels were not tested. The number `0x06010012` is a GPIO pad of the Intel chipset
 >   taken from *this* BIOS. On another model or another BIOS version the same number may point to a
 >   **different pin** (touchpad, display, power rails, anything). Writing to the wrong pin can make
 >   hardware stop working until reboot, and in the worst case can do things nobody can predict.
@@ -18,6 +19,8 @@
 > - **Read before you write.** The read command must return exactly `0x0` or `0x1`. Any other
 >   answer (an error, `not called`, a big number) means the pin or method does not exist on your
 >   machine: stop there.
+> - The hook is a **systemd-sleep** hook. On distributions without systemd (OpenRC, runit, s6, ...)
+>   it will not run as is; you would have to call the same command from your own resume hook.
 > - `acpi_call` lets root call **any** ACPI method. It is a powerful debugging tool, not a
 >   polished driver. A typo in a method name or argument goes straight to the firmware.
 > - `acpi_call` is an out-of-tree, unsigned module: it taints the kernel, and with Secure Boot /
@@ -56,7 +59,8 @@ sudo journalctl -k -b | grep 'usb 1-10'          # look for "USB disconnect" rig
 **2. Install and load `acpi_call`:**
 
 ```bash
-sudo pacman -S acpi_call-dkms               # or acpi_call for the stock "linux" kernel; other distros: acpi-call-dkms
+sudo pacman -S acpi_call-dkms               # tested: Arch Linux + linux-zen (DKMS needs linux-zen-headers)
+                                            # stock "linux" kernel: acpi_call; other distros: acpi-call-dkms (untested)
 sudo modprobe acpi_call
 ```
 
@@ -174,7 +178,8 @@ usb 1-10: USB disconnect, device number 3
 | Adapter | Realtek RTL8821C, Linux driver `rtw88` | **RTL8821CE**: Wi‑Fi 5 802.11ac 1x1 over PCIe (`10ec:c821`, subsystem `103c:831a`) + Bluetooth 4.2 over internal USB (`0bda:b00a`) |
 
 Verified on a real suspend/resume cycle: after `usb 1-10: USB disconnect` the adapter re-enumerates in the same second.
-Tested with kernel `7.2.11-zen1`, `linux-firmware-realtek 20260916`, Bluetooth firmware `0x75b8f098`, Arch Linux.
+Tested on **Arch Linux** with the **linux-zen** kernel `7.2.11-zen1` and **systemd**, `linux-firmware-realtek 20260916`,
+Bluetooth firmware `0x75b8f098`. Not tested on other distributions, kernels or init systems.
 
 Other HP 15s / 14s / 250 G8 models with the same board design are likely affected too, but the GPIO
 pin may differ. See [Other laptops](#other-laptops-finding-your-own-pin) before installing.
