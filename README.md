@@ -141,6 +141,7 @@ and reboot. Nothing else was changed.
 - [Symptoms](#symptoms)
 - [Affected hardware](#affected-hardware)
 - [Automatic installation](#automatic-installation-script)
+- [Kernel module (experimental)](#kernel-module-experimental-no-gpio-number-at-all)
 - [How it works](#how-it-works)
 - [Why the usual fixes don't work](#why-the-usual-fixes-dont-work)
 - [Diagnostic script](#diagnostic-script)
@@ -224,6 +225,46 @@ Same as the manual fix above, plus checks. Read the warning at the top first.
 
    You should see `BT_EN was 0x0, set to 0x1` in the journal and a
    working controller.
+
+## Kernel module (experimental): no GPIO number at all
+
+> [!WARNING]
+> Experimental. It builds cleanly, but it has **not yet been tested on real hardware**. Keep the
+> `acpi_call` hook installed until you have seen it work after a real suspend.
+
+Instead of hard-coding the pin, this is a modified copy of the kernel's own
+`drivers/platform/x86/wireless-hotkey.c` (Linux v7.2), the driver that already binds to HP's
+wireless device `HPQ6001`. The only addition: after every resume it calls **`\_SB.WLBT._STA`**
+again, the same BIOS method that switches the radios on at boot. The BIOS then raises the right
+GPIO pads itself, whatever their numbers are on a given model. Nothing to look up, nothing to
+configure.
+
+- Acts only on `HPQ6001` (HP). On AMD/Xiaomi/LG devices handled by the same driver it behaves
+  exactly like the stock one.
+- Module parameter `resume_fix` (default `Y`): `echo N | sudo tee /sys/module/wireless_hotkey/parameters/resume_fix` turns it off.
+- Side effect: `_STA` switches **both** radios on, so if airplane mode was on before suspend, the
+  radios come back on after resume (same as after a reboot).
+- Installed via DKMS into `updates/dkms`, so it takes priority over the in-kernel module and is
+  rebuilt automatically for new kernels.
+- Logs to the kernel log: `sudo journalctl -k -b | grep btfix`.
+
+### `btfix`: switch between the stock driver, the module and the hook
+
+`btfix` is a text menu that shows what is active right now (which `wireless-hotkey` is on disk
+and in memory, whether the hook is installed) and lets you switch:
+
+```bash
+sudo ./btfix --install-command   # once: installs the "btfix" command into /usr/local/bin
+btfix                            # menu (asks for sudo itself)
+btfix status                     # status only
+```
+
+Menu: 1) enable the btfix module · 2) back to the stock in-kernel `wireless-hotkey` ·
+3) install/remove the `acpi_call` hook · 4) apply now without reboot · 5) reboot ·
+6) show this boot's fix log.
+
+To check the module on first use, keep the hook installed: if the module worked, the hook will log
+`BT_EN already 0x1, nothing to do`, because the line is already up when the hook runs.
 
 ## How it works
 

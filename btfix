@@ -1,0 +1,199 @@
+#!/usr/bin/env bash
+# btfix — переключатель способа починки Bluetooth после сна на HP + RTL8821CE.
+#
+#   btfix               текстовое меню
+#   btfix status        только показать состояние
+#   sudo ./btfix --install-command    поставить команду btfix в /usr/local/bin
+#
+# Варианты:
+#   [stock]  wireless-hotkey из ядра — как было из коробки, без починки
+#   [btfix]  наш wireless-hotkey (DKMS): после сна вызывает метод BIOS WLBT._STA,
+#            BIOS сама находит и поднимает пины радио. Номер пина не нужен.
+#   [hook]   хук systemd-sleep + acpi_call, пин 0x06010012 (проверено на 15s-fq1xxx/86C9/F.30)
+
+set -u
+PKG=wireless-hotkey-btfix
+VER=1.0
+SRC_DST=/usr/src/$PKG-$VER
+SHARE=/usr/local/share/btfix
+HOOK=/usr/lib/systemd/system-sleep/bt-en-resume
+KV=$(uname -r)
+
+if [[ -t 1 ]]; then R=$'\e[31m'; G=$'\e[32m'; Y=$'\e[33m'; B=$'\e[1;36m'; D=$'\e[2m'; N=$'\e[0m'
+else R=; G=; Y=; B=; D=; N=; fi
+
+self_dir() { dirname "$(readlink -f "$0")"; }
+# где лежат исходники модуля и хук: рядом со скриптом (репозиторий) или в /usr/local/share/btfix
+find_assets() {
+    local d; d=$(self_dir)
+    if [[ -f $d/kernel-module/wireless-hotkey.c ]]; then ASSETS=$d
+    elif [[ -f $SHARE/kernel-module/wireless-hotkey.c ]]; then ASSETS=$SHARE
+    else ASSETS=""; fi
+}
+
+need_root() {
+    if [[ $EUID -ne 0 ]]; then exec sudo -- "$(readlink -f "$0")" "$@"; fi
+}
+
+ask() { local a; read -r -p "  $1 [y/N] " a; [[ $a == [yYдД]* ]]; }
+pause() { read -r -p "  Enter — продолжить..." _; }
+
+# ---------------------------------------------------------------- состояние
+detect() {
+    BUILTIN=0; grep -q '/wireless-hotkey\.ko' "/lib/modules/$KV/modules.builtin" 2>/dev/null && BUILTIN=1
+    HPDEV=0; ls -d /sys/bus/acpi/devices/HPQ6001:* >/dev/null 2>&1 && HPDEV=1
+    MODPATH=$(modinfo -n wireless_hotkey 2>/dev/null || true)
+    ONDISK=stock; [[ $MODPATH == */updates/* || $MODPATH == */extra/* ]] && ONDISK=btfix
+    [[ -z $MODPATH ]] && ONDISK=none
+    LOADED=none
+    if [[ -d /sys/module/wireless_hotkey ]]; then
+        if [[ $(cat /sys/module/wireless_hotkey/version 2>/dev/null) == *btfix* ]]; then LOADED=btfix; else LOADED=stock; fi
+    fi
+    RESUMEFIX=$(cat /sys/module/wireless_hotkey/parameters/resume_fix 2>/dev/null || echo -)
+    HOOKON=0; [[ -e $HOOK ]] && HOOKON=1
+    DKMSST=$(dkms status "$PKG/$VER" -k "$KV" 2>/dev/null | head -1)
+    ACPICALL=0; { [[ -e /proc/acpi/call ]] || modinfo acpi_call >/dev/null 2>&1; } && ACPICALL=1
+}
+
+label() { case $1 in btfix) echo "${G}btfix (с починкой)${N}";; stock) echo "стандартный из ядра";; none) echo "${R}нет${N}";; esac; }
+
+show_status() {
+    detect
+    echo
+    echo "${B}━━━ Bluetooth после сна: текущее состояние ━━━${N}"
+    echo "  Ядро:                    $KV"
+    echo "  Устройство HP HPQ6001:   $([[ $HPDEV -eq 1 ]] && echo "${G}есть${N}" || echo "${R}нет — модуль btfix ничего не будет делать${N}")"
+    echo "  wireless-hotkey на диске: $(label $ONDISK)  ${D}${MODPATH}${N}"
+    echo "  wireless-hotkey загружен: $(label $LOADED)$([[ $LOADED == btfix ]] && echo ", resume_fix=$RESUMEFIX")"
+    [[ $BUILTIN -eq 1 ]] && echo "  ${R}wireless-hotkey вшит в это ядро (=y) — заменить его модулем нельзя${N}"
+    [[ -n $DKMSST ]] && echo "  DKMS:                    ${D}$DKMSST${N}"
+    echo "  Хук acpi_call:           $([[ $HOOKON -eq 1 ]] && echo "${G}установлен${N}" || echo "не установлен")"
+    if [[ $ONDISK != "$LOADED" && $LOADED != none ]]; then
+        echo "  ${Y}На диске и в памяти разные версии — нужна перезагрузка (или пункт «применить сейчас»).${N}"
+    fi
+    echo
+    echo "  Итого: $(
+        if [[ $LOADED == btfix ]]; then echo "${G}чинит модуль btfix${N}$([[ $HOOKON -eq 1 ]] && echo " + хук как подстраховка")"
+        elif [[ $HOOKON -eq 1 ]]; then echo "${G}чинит хук acpi_call${N}"
+        else echo "${R}починка не активна — Bluetooth будет пропадать после сна${N}"; fi)"
+}
+
+# ---------------------------------------------------------------- действия
+headers_pkg() {
+    local base; base=$(pacman -Qqo "/usr/lib/modules/$KV" 2>/dev/null | head -1)
+    [[ -n $base ]] && echo "${base}-headers"
+}
+
+install_module() {
+    find_assets
+    [[ -n $ASSETS ]] || { echo "  ${R}Не нашёл исходники модуля (kernel-module/).${N}"; return 1; }
+    [[ $BUILTIN -eq 1 ]] && { echo "  ${R}wireless-hotkey вшит в ядро — модулем не заменить.${N}"; return 1; }
+    [[ $HPDEV -eq 1 ]] || echo "  ${Y}Внимание: устройства HPQ6001 нет, починка срабатывать не будет.${N}"
+
+    local hp; hp=$(headers_pkg)
+    local need=()
+    command -v dkms >/dev/null || need+=(dkms)
+    [[ -e /lib/modules/$KV/build ]] || { [[ -n $hp ]] && need+=("$hp"); }
+    if [[ ${#need[@]} -gt 0 ]]; then
+        echo "  Нужны пакеты: ${need[*]}"
+        ask "Установить через pacman?" || return 1
+        pacman -S --needed "${need[@]}" || return 1
+    fi
+
+    echo "  Копирую исходники в $SRC_DST"
+    rm -rf "$SRC_DST"; mkdir -p "$SRC_DST"
+    cp "$ASSETS"/kernel-module/{wireless-hotkey.c,Makefile,dkms.conf} "$SRC_DST"/
+    dkms status "$PKG/$VER" 2>/dev/null | grep -q . || dkms add "$PKG/$VER" || return 1
+    echo "  Собираю и ставлю (dkms install)..."
+    if ! dkms install "$PKG/$VER" -k "$KV" --force; then
+        echo "  ${R}Сборка не удалась. Лог: /var/lib/dkms/$PKG/$VER/build/make.log${N}"
+        return 1
+    fi
+    depmod -a "$KV"
+    detect
+    if [[ $ONDISK == btfix ]]; then echo "  ${G}Готово: на диске теперь модуль btfix.${N}"
+    else echo "  ${R}Модуль собран, но система всё ещё выбирает стандартный: $MODPATH${N}"; return 1; fi
+    if [[ $HOOKON -eq 1 ]]; then
+        echo "  Хук acpi_call тоже установлен. Его стоит оставить на первый тест:"
+        echo "  если модуль сработает раньше, хук напишет в журнал «BT_EN already 0x1»."
+    fi
+    echo "  Изменения вступят в силу после перезагрузки (или «применить сейчас»)."
+}
+
+remove_module() {
+    if dkms status "$PKG" 2>/dev/null | grep -q .; then
+        dkms remove "$PKG/$VER" --all || true
+    fi
+    rm -rf "$SRC_DST"
+    depmod -a "$KV"
+    detect
+    echo "  ${G}Модуль btfix удалён, на диске снова: $(label $ONDISK)${N}"
+    if [[ $HOOKON -eq 0 ]]; then
+        echo "  ${Y}Ни модуля, ни хука — Bluetooth снова будет пропадать после сна.${N}"
+        ask "Поставить хук acpi_call?" && install_hook
+    fi
+    echo "  Изменения вступят в силу после перезагрузки (или «применить сейчас»)."
+}
+
+install_hook() {
+    find_assets
+    [[ -f ${ASSETS:-/nonexistent}/bt-en-resume ]] || { echo "  ${R}Не нашёл файл bt-en-resume.${N}"; return 1; }
+    [[ $ACPICALL -eq 1 ]] || echo "  ${Y}Модуля acpi_call нет: хук ничего не сможет сделать (pacman -S acpi_call-dkms).${N}"
+    install -Dm755 "$ASSETS/bt-en-resume" "$HOOK" && echo "  ${G}Хук установлен: $HOOK${N}"
+}
+
+remove_hook() { rm -f "$HOOK" && echo "  ${G}Хук удалён.${N}"; }
+
+apply_now() {
+    echo "  Перезагружаю модуль wireless_hotkey (клавиша «режим самолёта» на секунду пропадёт)..."
+    modprobe -r wireless_hotkey 2>/dev/null
+    modprobe wireless_hotkey && detect && echo "  Загружен: $(label $LOADED)"
+}
+
+install_command() {
+    local d; d=$(self_dir)
+    mkdir -p "$SHARE"
+    cp -r "$d/kernel-module" "$SHARE/" 2>/dev/null
+    cp "$d/bt-en-resume" "$SHARE/" 2>/dev/null
+    install -Dm755 "$d/btfix" /usr/local/bin/btfix
+    echo "Команда установлена: /usr/local/bin/btfix (файлы: $SHARE). Запуск: btfix"
+}
+
+# ---------------------------------------------------------------- меню
+menu() {
+    while true; do
+        clear 2>/dev/null
+        show_status
+        echo
+        echo "${B}━━━ Что сделать ━━━${N}"
+        echo "  1) Включить модуль btfix (заменить стандартный wireless-hotkey)"
+        echo "  2) Вернуть стандартный wireless-hotkey из ядра"
+        if [[ $HOOKON -eq 1 ]]; then echo "  3) Удалить хук acpi_call"
+        else echo "  3) Установить хук acpi_call"; fi
+        echo "  4) Применить сейчас, без перезагрузки"
+        echo "  5) Перезагрузить компьютер"
+        echo "  6) Показать журнал починки за эту загрузку"
+        echo "  q) Выход"
+        echo
+        read -r -p "  Выбор: " c
+        echo
+        case $c in
+            1) install_module; pause ;;
+            2) ask "Вернуть стандартный драйвер?" && remove_module; pause ;;
+            3) if [[ $HOOKON -eq 1 ]]; then remove_hook; else install_hook; fi; pause ;;
+            4) apply_now; pause ;;
+            5) ask "Перезагрузить сейчас?" && systemctl reboot ;;
+            6) journalctl -b --no-pager -o short -t bt-en-resume 2>/dev/null | tail -10
+               journalctl -b -k --no-pager -o short 2>/dev/null | grep -i btfix | tail -10
+               pause ;;
+            q|Q|й|Й) exit 0 ;;
+        esac
+    done
+}
+
+case ${1:-} in
+    status) show_status ;;
+    --install-command) need_root "$@"; install_command ;;
+    -h|--help) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//' ;;
+    *) need_root "$@"; menu ;;
+esac
