@@ -1,0 +1,5 @@
+logs/
+acpi/
+.last_usb_port
+*.dat
+*.dsl
