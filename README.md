@@ -235,7 +235,7 @@ Same as the manual fix above, plus checks. Read the warning at the top first.
 > `btfix: radios re-enabled by BIOS _STA after resume (0xf)`; Bluetooth comes back with no
 > `acpi_call` and no hook. Bluetooth headphones reconnect normally.
 >
-> Also run on an HP Victus 15 (AMD, RTL8852AE) that does not have the bug: no side effects, see
+> Also run on an HP Victus 16-e0xxx (AMD, RTL8852AE) that does not have the bug: no side effects, see
 > [Test results](#test-results).
 >
 > On other HP models it should work the same way (it calls the BIOS's own method instead of a
@@ -288,10 +288,10 @@ nothing to do`, which means the module already did the job.
 
 ## Test results
 
-| | HP 15s-fq1120ur | HP Victus 15 (AMD) |
+| | HP 15s-fq1120ur | HP Victus 16-e0xxx (AMD) |
 |---|---|---|
-| DMI board / BIOS | `86C9` / F.30 | *to be added* |
-| CPU / platform | Intel Ice Lake (10th gen) | AMD Ryzen 5000 "Cezanne" (Radeon Vega iGPU) + NVIDIA GTX 1650 Mobile |
+| DMI board / BIOS | `86C9` / F.30 | `88EB` / F.18 |
+| CPU / platform | Intel Ice Lake (10th gen) | AMD Ryzen 5 5600H "Cezanne" (Radeon Vega iGPU) + NVIDIA GTX 1650 Mobile |
 | Wi‑Fi / Bluetooth | Realtek RTL8821CE (`10ec:c821`, `rtw88`) / USB `0bda:b00a` | Realtek RTL8852AE (`10ec:8852`, `rtw89`) / USB `0bda:2852` |
 | `HPQ6001` present | yes | yes |
 | Sleep mode | S3 (`deep`) | S3 (`deep`) |

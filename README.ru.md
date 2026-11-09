@@ -235,7 +235,7 @@ usb 1-10: USB disconnect, device number 3
 > `btfix: radios re-enabled by BIOS _STA after resume (0xf)`. Bluetooth возвращается без
 > `acpi_call` и без хука, Bluetooth-наушники подключаются как обычно.
 >
-> Также запущен на HP Victus 15 (AMD, RTL8852AE), где бага нет: побочных эффектов нет, см.
+> Также запущен на HP Victus 16-e0xxx (AMD, RTL8852AE), где бага нет: побочных эффектов нет, см.
 > [Результаты тестов](#результаты-тестов).
 >
 > На других моделях HP он должен работать так же (вызывает собственный метод BIOS, а не зашитый
@@ -288,10 +288,10 @@ btfix          # 1) включить модуль btfix, затем 5) пере�
 
 ## Результаты тестов
 
-| | HP 15s-fq1120ur | HP Victus 15 (AMD) |
+| | HP 15s-fq1120ur | HP Victus 16-e0xxx (AMD) |
 |---|---|---|
-| Плата DMI / BIOS | `86C9` / F.30 | *будет добавлено* |
-| Процессор / платформа | Intel Ice Lake (10-е поколение) | AMD Ryzen 5000 «Cezanne» (встроенная Radeon Vega) + NVIDIA GTX 1650 Mobile |
+| Плата DMI / BIOS | `86C9` / F.30 | `88EB` / F.18 |
+| Процессор / платформа | Intel Ice Lake (10-е поколение) | AMD Ryzen 5 5600H «Cezanne» (встроенная Radeon Vega) + NVIDIA GTX 1650 Mobile |
 | Wi‑Fi / Bluetooth | Realtek RTL8821CE (`10ec:c821`, `rtw88`) / USB `0bda:b00a` | Realtek RTL8852AE (`10ec:8852`, `rtw89`) / USB `0bda:2852` |
 | Есть `HPQ6001` | да | да |
 | Режим сна | S3 (`deep`) | S3 (`deep`) |
