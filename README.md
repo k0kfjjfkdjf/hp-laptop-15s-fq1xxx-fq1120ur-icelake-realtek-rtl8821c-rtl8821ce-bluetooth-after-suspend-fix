@@ -183,8 +183,27 @@ Verified on a real suspend/resume cycle: after `usb 1-10: USB disconnect` the ad
 Tested on **Arch Linux** with the **linux-zen** kernel `7.2.11-zen1` and **systemd**, `linux-firmware-realtek 20260916`,
 Bluetooth firmware `0x75b8f098`. Not tested on other distributions, kernels or init systems.
 
-Other HP 15s / 14s / 250 G8 models with the same board design are likely affected too, but the GPIO
-pin may differ. See [Other laptops](#other-laptops-finding-your-own-pin) before installing.
+### Possibly affected (not tested)
+
+Other people have reported the **same symptom** (Bluetooth gone after S3 until reboot, Realtek
+combo card) on these HP models. The btfix kernel module **may** help them, because it calls the
+BIOS's own method instead of a fixed pin, but this is **not confirmed**: I do not own these
+laptops and have not tested them.
+
+| Model | Card | Report |
+|---|---|---|
+| HP 15s-fq1xxx (other configurations) | RTL8822CE, BT `0bda:b00c` | [Manjaro forum, 2021](https://forum.manjaro.org/t/bluetooth-card-disappeares-after-suspend/59744) |
+| HP 15s-fq1xxx | RTL8821CE, BT `0bda:b00a` | [Launchpad #2069546](https://bugs.launchpad.net/bugs/2069546) |
+| HP 14-dq1xxx | RTL8822CE | [kernel bug 210141](https://bugzilla.kernel.org/show_bug.cgi?id=210141) |
+| HP 17-by0xxx | RTL8821CE | [kernel bug 210141](https://bugzilla.kernel.org/show_bug.cgi?id=210141) |
+
+Likely the same applies to other budget HP 14/15/17 laptops on Intel from about 2019–2021 with an
+`HPQ6001` device and S3 (`deep`) sleep. Not confirmed either. The `acpi_call` hook with the fixed pin
+`0x06010012` is **only** for HP 15s-fq1xxx / board `86C9` / BIOS F.30; on any other model see
+[Other laptops](#other-laptops-finding-your-own-pin).
+
+**If you have one of these laptops**, please test the module and open an issue with the result
+(model, `board_name`, BIOS version, card, worked or not), even if it did not help.
 
 ## Automatic installation (script)
 
