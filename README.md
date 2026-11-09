@@ -288,20 +288,22 @@ nothing to do`, which means the module already did the job.
 
 ## Test results
 
-| | HP 15s-fq1120ur | HP Victus 16-e0xxx (AMD) |
-|---|---|---|
-| DMI board / BIOS | `86C9` / F.30 | `88EB` / F.18 |
-| CPU / platform | Intel Ice Lake (10th gen) | AMD Ryzen 5 5600H "Cezanne" (Radeon Vega iGPU) + NVIDIA GTX 1650 Mobile |
-| Wi‑Fi / Bluetooth | Realtek RTL8821CE (`10ec:c821`, `rtw88`) / USB `0bda:b00a` | Realtek RTL8852AE (`10ec:8852`, `rtw89`) / USB `0bda:2852` |
-| `HPQ6001` present | yes | yes |
-| Sleep mode | S3 (`deep`) | S3 (`deep`) |
-| Kernel | linux-zen 7.2.11, Arch Linux, systemd | linux-zen 7.2.14, Arch Linux, systemd |
-| Bluetooth after S3, **no fix** | **lost** (`usb 1-10: USB disconnect`) | kept, no USB disconnect |
-| Bluetooth after S3, **btfix module** | **restored** (`radios re-enabled ... (0xf)`) | kept; Wi‑Fi and Bluetooth both fine (`radios re-enabled ... (0xf)`) |
-| Verdict | bug present, module fixes it | no bug; module is harmless |
+| | HP 15s-fq1120ur | HP Victus 16-e0xxx (AMD) | HP Victus 16-e0xxx + **RTL8821CE from the HP 15s** |
+|---|---|---|---|
+| DMI board / BIOS | `86C9` / F.30 | `88EB` / F.18 | `88EB` / F.18 |
+| CPU / platform | Intel Ice Lake (10th gen) | AMD Ryzen 5 5600H "Cezanne" (Radeon Vega iGPU) + NVIDIA GTX 1650 Mobile | same |
+| Wi‑Fi / Bluetooth | Realtek RTL8821CE (`10ec:c821`, `rtw88`) / USB `0bda:b00a` | Realtek RTL8852AE (`10ec:8852`, `rtw89`) / USB `0bda:2852` | the **same card** moved over: RTL8821CE `103c:831a` / USB `0bda:b00a` |
+| `HPQ6001` present | yes | yes | yes |
+| Sleep mode | S3 (`deep`) | S3 (`deep`) | S3 (`deep`) |
+| Kernel | linux-zen 7.2.11, Arch Linux, systemd | linux-zen 7.2.14, Arch Linux, systemd | linux-zen 7.2.14, Arch Linux, systemd |
+| Bluetooth after S3, **no fix** | **lost** (`usb 1-10: USB disconnect`) | kept, no USB disconnect | **kept**, no USB disconnect |
+| Bluetooth after S3, **btfix module** | **restored** (`radios re-enabled ... (0xf)`) | kept; Wi‑Fi and Bluetooth both fine (`radios re-enabled ... (0xf)`) | not needed |
+| Verdict | bug present, module fixes it | no bug; module is harmless | **same card, no bug: the HP 15s BIOS is the cause** |
 
 What this shows: the bug is in the BIOS of specific HP models, not in Realtek chips or Linux.
 The Victus BIOS re-enables Bluetooth on resume by itself; the HP 15s-fq1xxx BIOS does not.
+The decisive test: the **very same RTL8821CE card**, moved from the HP 15s into the Victus, keeps
+Bluetooth after S3 with no fix at all.
 Re-running the BIOS's own `WLBT._STA` on a machine that does not need it changes nothing.
 
 Test procedure: `resume_fix=N` → S3 suspend/resume → check `lsusb`/`bluetoothctl show` and the

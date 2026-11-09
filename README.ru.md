@@ -288,20 +288,22 @@ btfix          # 1) включить модуль btfix, затем 5) пере�
 
 ## Результаты тестов
 
-| | HP 15s-fq1120ur | HP Victus 16-e0xxx (AMD) |
-|---|---|---|
-| Плата DMI / BIOS | `86C9` / F.30 | `88EB` / F.18 |
-| Процессор / платформа | Intel Ice Lake (10-е поколение) | AMD Ryzen 5 5600H «Cezanne» (встроенная Radeon Vega) + NVIDIA GTX 1650 Mobile |
-| Wi‑Fi / Bluetooth | Realtek RTL8821CE (`10ec:c821`, `rtw88`) / USB `0bda:b00a` | Realtek RTL8852AE (`10ec:8852`, `rtw89`) / USB `0bda:2852` |
-| Есть `HPQ6001` | да | да |
-| Режим сна | S3 (`deep`) | S3 (`deep`) |
-| Ядро | linux-zen 7.2.11, Arch Linux, systemd | linux-zen 7.2.14, Arch Linux, systemd |
-| Bluetooth после S3, **без починки** | **пропадает** (`usb 1-10: USB disconnect`) | сохраняется, отвала USB нет |
-| Bluetooth после S3, **с модулем btfix** | **возвращается** (`radios re-enabled ... (0xf)`) | сохраняется; Wi‑Fi и Bluetooth в порядке (`radios re-enabled ... (0xf)`) |
-| Вывод | баг есть, модуль его чинит | бага нет; модуль ничего не ломает |
+| | HP 15s-fq1120ur | HP Victus 16-e0xxx (AMD) | HP Victus 16-e0xxx + **RTL8821CE из HP 15s** |
+|---|---|---|---|
+| Плата DMI / BIOS | `86C9` / F.30 | `88EB` / F.18 | `88EB` / F.18 |
+| Процессор / платформа | Intel Ice Lake (10-е поколение) | AMD Ryzen 5 5600H «Cezanne» (встроенная Radeon Vega) + NVIDIA GTX 1650 Mobile | те же |
+| Wi‑Fi / Bluetooth | Realtek RTL8821CE (`10ec:c821`, `rtw88`) / USB `0bda:b00a` | Realtek RTL8852AE (`10ec:8852`, `rtw89`) / USB `0bda:2852` | **та же карта**, переставленная: RTL8821CE `103c:831a` / USB `0bda:b00a` |
+| Есть `HPQ6001` | да | да | да |
+| Режим сна | S3 (`deep`) | S3 (`deep`) | S3 (`deep`) |
+| Ядро | linux-zen 7.2.11, Arch Linux, systemd | linux-zen 7.2.14, Arch Linux, systemd | linux-zen 7.2.14, Arch Linux, systemd |
+| Bluetooth после S3, **без починки** | **пропадает** (`usb 1-10: USB disconnect`) | сохраняется, отвала USB нет | **сохраняется**, отвала USB нет |
+| Bluetooth после S3, **с модулем btfix** | **возвращается** (`radios re-enabled ... (0xf)`) | сохраняется; Wi‑Fi и Bluetooth в порядке (`radios re-enabled ... (0xf)`) | не требуется |
+| Вывод | баг есть, модуль его чинит | бага нет; модуль ничего не ломает | **та же карта, бага нет: виновата BIOS HP 15s** |
 
 Что это значит: баг сидит в BIOS конкретных моделей HP, а не в чипах Realtek и не в Linux.
-BIOS Victus сама включает Bluetooth после пробуждения, BIOS HP 15s-fq1xxx — нет. Повторный вызов
+BIOS Victus сама включает Bluetooth после пробуждения, BIOS HP 15s-fq1xxx — нет.
+Решающий тест: **та же самая карта RTL8821CE**, переставленная из HP 15s в Victus, сохраняет
+Bluetooth после S3 вообще без починки. Повторный вызов
 метода BIOS `WLBT._STA` на машине, которой он не нужен, ничего не меняет.
 
 Как проверяли: `resume_fix=N` → сон S3 и пробуждение → проверка `lsusb`/`bluetoothctl show` и
