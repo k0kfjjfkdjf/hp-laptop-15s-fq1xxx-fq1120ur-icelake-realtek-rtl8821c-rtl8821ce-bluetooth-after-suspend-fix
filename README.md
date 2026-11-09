@@ -291,7 +291,7 @@ nothing to do`, which means the module already did the job.
 | | HP 15s-fq1120ur | HP Victus 15 (AMD) |
 |---|---|---|
 | DMI board / BIOS | `86C9` / F.30 | *to be added* |
-| CPU / platform | Intel Core i5 Ice Lake | AMD Ryzen 5000 "Cezanne" (Radeon Vega iGPU) + NVIDIA GTX 1650 Mobile |
+| CPU / platform | Intel Ice Lake (10th gen) | AMD Ryzen 5000 "Cezanne" (Radeon Vega iGPU) + NVIDIA GTX 1650 Mobile |
 | Wi‑Fi / Bluetooth | Realtek RTL8821CE (`10ec:c821`, `rtw88`) / USB `0bda:b00a` | Realtek RTL8852AE (`10ec:8852`, `rtw89`) / USB `0bda:2852` |
 | `HPQ6001` present | yes | yes |
 | Sleep mode | S3 (`deep`) | S3 (`deep`) |

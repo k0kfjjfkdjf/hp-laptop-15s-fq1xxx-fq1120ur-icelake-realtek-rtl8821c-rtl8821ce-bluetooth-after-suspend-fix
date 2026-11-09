@@ -291,7 +291,7 @@ btfix          # 1) включить модуль btfix, затем 5) пере�
 | | HP 15s-fq1120ur | HP Victus 15 (AMD) |
 |---|---|---|
 | Плата DMI / BIOS | `86C9` / F.30 | *будет добавлено* |
-| Процессор / платформа | Intel Core i5 Ice Lake | AMD Ryzen 5000 «Cezanne» (встроенная Radeon Vega) + NVIDIA GTX 1650 Mobile |
+| Процессор / платформа | Intel Ice Lake (10-е поколение) | AMD Ryzen 5000 «Cezanne» (встроенная Radeon Vega) + NVIDIA GTX 1650 Mobile |
 | Wi‑Fi / Bluetooth | Realtek RTL8821CE (`10ec:c821`, `rtw88`) / USB `0bda:b00a` | Realtek RTL8852AE (`10ec:8852`, `rtw89`) / USB `0bda:2852` |
 | Есть `HPQ6001` | да | да |
 | Режим сна | S3 (`deep`) | S3 (`deep`) |
