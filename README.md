@@ -142,6 +142,7 @@ and reboot. Nothing else was changed.
 - [Affected hardware](#affected-hardware)
 - [Automatic installation](#automatic-installation-script)
 - [Kernel module (recommended)](#kernel-module-recommended-no-gpio-number-at-all)
+- [Test results](#test-results)
 - [How it works](#how-it-works)
 - [Why the usual fixes don't work](#why-the-usual-fixes-dont-work)
 - [Diagnostic script](#diagnostic-script)
@@ -234,6 +235,9 @@ Same as the manual fix above, plus checks. Read the warning at the top first.
 > `btfix: radios re-enabled by BIOS _STA after resume (0xf)`; Bluetooth comes back with no
 > `acpi_call` and no hook. Bluetooth headphones reconnect normally.
 >
+> Also run on an HP Victus 15 (AMD, RTL8852AE) that does not have the bug: no side effects, see
+> [Test results](#test-results).
+>
 > On other HP models it should work the same way (it calls the BIOS's own method instead of a
 > hard-coded pin), but that has not been tested. If it does not help on your model, the
 > `acpi_call` hook below remains as a fallback.
@@ -281,6 +285,27 @@ btfix          # 1) enable the btfix module, then 5) reboot
 After a suspend/resume, `sudo journalctl -b -k | grep btfix` should show the `re-enabled` line.
 If you also keep the `acpi_call` hook as a safety net, the hook will log `BT_EN already 0x1,
 nothing to do`, which means the module already did the job.
+
+## Test results
+
+| | HP 15s-fq1120ur | HP Victus 15 (AMD) |
+|---|---|---|
+| DMI board / BIOS | `86C9` / F.30 | *to be added* |
+| CPU / platform | Intel Core i5 Ice Lake | AMD Ryzen 5000 "Cezanne" (Radeon Vega iGPU) + NVIDIA GTX 1650 Mobile |
+| Wi‑Fi / Bluetooth | Realtek RTL8821CE (`10ec:c821`, `rtw88`) / USB `0bda:b00a` | Realtek RTL8852AE (`10ec:8852`, `rtw89`) / USB `0bda:2852` |
+| `HPQ6001` present | yes | yes |
+| Sleep mode | S3 (`deep`) | S3 (`deep`) |
+| Kernel | linux-zen 7.2.11, Arch Linux, systemd | linux-zen 7.2.14, Arch Linux, systemd |
+| Bluetooth after S3, **no fix** | **lost** (`usb 1-10: USB disconnect`) | kept, no USB disconnect |
+| Bluetooth after S3, **btfix module** | **restored** (`radios re-enabled ... (0xf)`) | kept; Wi‑Fi and Bluetooth both fine (`radios re-enabled ... (0xf)`) |
+| Verdict | bug present, module fixes it | no bug; module is harmless |
+
+What this shows: the bug is in the BIOS of specific HP models, not in Realtek chips or Linux.
+The Victus BIOS re-enables Bluetooth on resume by itself; the HP 15s-fq1xxx BIOS does not.
+Re-running the BIOS's own `WLBT._STA` on a machine that does not need it changes nothing.
+
+Test procedure: `resume_fix=N` → S3 suspend/resume → check `lsusb`/`bluetoothctl show` and the
+kernel log; then `resume_fix=Y` → S3 again → check again.
 
 ## How it works
 
