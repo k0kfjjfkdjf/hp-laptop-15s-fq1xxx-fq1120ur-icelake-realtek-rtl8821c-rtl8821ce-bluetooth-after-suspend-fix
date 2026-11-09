@@ -131,8 +131,10 @@ remove_module() {
     detect
     echo "  ${G}Модуль btfix удалён, на диске снова: $(label $ONDISK)${N}"
     if [[ $HOOKON -eq 0 ]]; then
-        echo "  ${Y}Ни модуля, ни хука — Bluetooth снова будет пропадать после сна.${N}"
-        ask "Поставить хук acpi_call?" && install_hook
+        echo "  ${Y}Ни модуля, ни хука: если на этой машине есть баг, Bluetooth будет пропадать после сна.${N}"
+        if [[ $(cat /sys/class/dmi/id/board_name 2>/dev/null) == 86C9 ]]; then
+            ask "Поставить хук acpi_call?" && install_hook
+        fi
     fi
     echo "  Изменения вступят в силу после перезагрузки (или «применить сейчас»)."
 }
@@ -140,6 +142,16 @@ remove_module() {
 install_hook() {
     find_assets
     [[ -f ${ASSETS:-/nonexistent}/bt-en-resume ]] || { echo "  ${R}Не нашёл файл bt-en-resume.${N}"; return 1; }
+    # хук пишет в конкретный GPIO-пин из BIOS HP 15s-fq1xxx: на другой машине это может быть другой пин
+    local model board bios
+    model=$(cat /sys/class/dmi/id/product_name 2>/dev/null); board=$(cat /sys/class/dmi/id/board_name 2>/dev/null)
+    bios=$(cat /sys/class/dmi/id/bios_version 2>/dev/null)
+    if [[ $model != *"15s-fq1"* || $board != "86C9" || $bios != "F.30" ]]; then
+        echo "  ${R}Хук нельзя ставить на эту машину: $model, плата $board, BIOS $bios.${N}"
+        echo "  Он пишет в GPIO-пин 0x06010012 из BIOS HP 15s-fq1xxx (плата 86C9, BIOS F.30)."
+        echo "  Здесь этот номер может означать другой пин. Используй модуль btfix (пункт 1)."
+        return 1
+    fi
     [[ $ACPICALL -eq 1 ]] || echo "  ${Y}Модуля acpi_call нет: хук ничего не сможет сделать (pacman -S acpi_call-dkms).${N}"
     install -Dm755 "$ASSETS/bt-en-resume" "$HOOK" && echo "  ${G}Хук установлен: $HOOK${N}"
 }
