@@ -64,7 +64,7 @@ show_status() {
     echo "  Ядро:                    $KV"
     echo "  Устройство HP HPQ6001:   $([[ $HPDEV -eq 1 ]] && echo "${G}есть${N}" || echo "${R}нет — модуль btfix ничего не будет делать${N}")"
     echo "  wireless-hotkey на диске: $(label $ONDISK)  ${D}${MODPATH}${N}"
-    echo "  wireless-hotkey загружен: $(label $LOADED)$([[ $LOADED == btfix ]] && echo ", resume_fix=$RESUMEFIX")"
+    echo "  wireless-hotkey загружен: $(label $LOADED)$([[ $LOADED == btfix ]] && { [[ $RESUMEFIX == Y ]] && echo ", resume_fix=Y" || echo ", ${R}resume_fix=$RESUMEFIX (починка выключена)${N}"; })"
     [[ $BUILTIN -eq 1 ]] && echo "  ${R}wireless-hotkey вшит в это ядро (=y) — заменить его модулем нельзя${N}"
     [[ -n $DKMSST ]] && echo "  DKMS:                    ${D}$DKMSST${N}"
     echo "  Хук acpi_call:           $([[ $HOOKON -eq 1 ]] && echo "${G}установлен${N}" || echo "не установлен")"
@@ -73,7 +73,9 @@ show_status() {
     fi
     echo
     echo "  Итого: $(
-        if [[ $LOADED == btfix ]]; then echo "${G}чинит модуль btfix${N}$([[ $HOOKON -eq 1 ]] && echo " + хук как подстраховка")"
+        if [[ $LOADED == btfix && $RESUMEFIX == Y ]]; then echo "${G}чинит модуль btfix${N}$([[ $HOOKON -eq 1 ]] && echo " + хук как подстраховка")"
+        elif [[ $LOADED == btfix && $HOOKON -eq 1 ]]; then echo "${Y}модуль btfix загружен, но починка в нём выключена (resume_fix=$RESUMEFIX)${N}; чинит хук acpi_call"
+        elif [[ $LOADED == btfix ]]; then echo "${R}модуль btfix загружен, но починка в нём выключена (resume_fix=$RESUMEFIX)${N} — включить: echo Y | sudo tee /sys/module/wireless_hotkey/parameters/resume_fix"
         elif [[ $HOOKON -eq 1 ]]; then echo "${G}чинит хук acpi_call${N}"
         else echo "${R}починка не активна — Bluetooth будет пропадать после сна${N}"; fi)"
 }
